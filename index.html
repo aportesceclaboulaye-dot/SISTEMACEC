@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sistema Financiero</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+
+<style>
+  :root {
+    --paper: #F7F5F0;
+    --paper-dim: #EFEBE2;
+    --ink: #1C1B19;
+    --ink-soft: #5A564C;
+    --line: #D8D2C2;
+    --gain: #1F6E4A;
+    --loss: #A8412E;
+    --accent: #B08D2B;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3 { font-family: 'Source Serif 4', serif; margin: 0; }
+  .mono { font-family: 'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; }
+  .hidden { display: none !important; }
+
+  /* ---------- Login ---------- */
+  #login-screen {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .login-box {
+    width: 100%;
+    max-width: 380px;
+  }
+  .login-eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    text-align: center;
+    margin-bottom: 6px;
+  }
+  .login-title { text-align: center; font-size: 28px; font-weight: 600; margin-bottom: 24px; }
+  .card {
+    background: rgba(255,255,255,0.6);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 20px;
+  }
+  label { display: block; font-size: 12px; font-weight: 500; color: var(--ink-soft); margin-bottom: 4px; }
+  input, select, textarea {
+    width: 100%;
+    border: 1px solid var(--line);
+    background: var(--paper);
+    padding: 9px 10px;
+    font-size: 14px;
+    border-radius: 3px;
+    font-family: inherit;
+    color: var(--ink);
+  }
+  input:focus, select:focus, textarea:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+  .field { margin-bottom: 14px; }
+  button {
+    cursor: pointer;
+    font-family: inherit;
+    border: none;
+  }
+  .btn-primary {
+    width: 100%;
+    background: var(--ink);
+    color: var(--paper);
+    font-size: 14px;
+    font-weight: 500;
+    padding: 11px;
+    border-radius: 3px;
+  }
+  .btn-primary:hover { background: #333; }
+  .btn-secondary {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--ink-soft);
+    font-size: 12px;
+    font-weight: 500;
+    padding: 6px 12px;
+    border-radius: 3px;
+  }
+  .btn-secondary:hover { color: var(--ink); border-color: var(--ink); }
+  .error-msg {
+    font-size: 13px;
+    color: var(--loss);
+    background: rgba(168,65,46,0.06);
+    border: 1px solid rgba(168,65,46,0.3);
+    border-radius: 3px;
+    padding: 8px 10px;
+    margin-bottom: 12px;
+  }
+  .hint { text-align: center; font-size: 12px; color: var(--ink-soft); margin-top: 18px; }
+
+  /* ---------- App shell ---------- */
+  #app-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--line);
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  #app-header .brand { display: flex; flex-direction: column; }
+  #app-header .brand .eyebrow {
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--ink-soft);
+  }
+  #app-header .brand h1 { font-size: 20px; }
+  #nav {
+    display: flex; gap: 4px; flex-wrap: wrap;
+  }
+  .nav-btn {
+    background: transparent;
+    color: var(--ink-soft);
+    font-size: 13px;
+    font-weight: 500;
+    padding: 8px 14px;
+    border-radius: 3px;
+  }
+  .nav-btn:hover { background: var(--paper-dim); color: var(--ink); }
+  .nav-btn.active { background: var(--ink); color: var(--paper); }
+
+  main { padding: 24px; max-width: 1200px; margin: 0 auto; }
+  .section { display: none; }
+  .section.active { display: block; }
+
+  .grid { display: grid; gap: 16px; }
+  .grid-4 { grid-template-columns: repeat(4, 1fr); }
+  .grid-2 { grid-template-columns: 1.4fr 1fr; }
+  @media (max-width: 900px) { .grid-4 { grid-template-columns: repeat(2, 1fr); } .grid-2 { grid-template-columns: 1fr; } }
+
+  .stat-card {
+    background: white;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 16px;
+  }
+  .stat-card .label {
+    font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.15em;
+    text-transform: uppercase; color: var(--ink-soft); margin-bottom: 8px;
+  }
+  .stat-card .value { font-size: 24px; font-weight: 600; font-family: 'IBM Plex Mono', monospace; }
+  .stat-card .value.gain { color: var(--gain); }
+  .stat-card .value.loss { color: var(--loss); }
+
+  .balance-strip {
+    background: var(--ink);
+    color: var(--paper);
+    border-radius: 4px;
+    padding: 20px;
+  }
+  .balance-strip .row { display: flex; justify-content: space-between; font-size: 14px; color: rgba(247,245,240,0.8); margin-bottom: 6px; }
+  .balance-strip .total {
+    border-top: 1px dashed rgba(247,245,240,0.25);
+    padding-top: 12px; margin-top: 10px;
+    display: flex; justify-content: space-between; align-items: baseline;
+  }
+  .balance-strip .total .amount { font-size: 26px; font-weight: 600; color: var(--accent); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; font-family: 'IBM Plex Mono', monospace; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  td { padding: 10px; border-bottom: 1px solid var(--line); }
+  tr:last-child td { border-bottom: none; }
+  .amount-in { color: var(--gain); font-family: 'IBM Plex Mono', monospace; font-weight: 600; }
+  .amount-out { color: var(--loss); font-family: 'IBM Plex Mono', monospace; font-weight: 600; }
+
+  .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px; }
+  .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+
+  .empty-state {
+    border: 1px dashed var(--line);
+    border-radius: 4px;
+    padding: 32px;
+    text-align: center;
+    color: var(--ink-soft);
+    font-size: 13px;
+  }
+
+  .badge {
+    display: inline-block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--paper-dim);
+    color: var(--ink-soft);
+  }
+
+  .chart-wrap { background: white; border: 1px solid var(--line); border-radius: 4px; padding: 16px; margin-top: 16px; }
+
+  .icon-btn {
+    background: transparent; color: var(--ink-soft); font-size: 12px;
+    border: 1px solid var(--line); border-radius: 3px; padding: 4px 8px;
+  }
+  .icon-btn:hover { color: var(--loss); border-color: var(--loss); }
+</style>
+</head>
+<body>
+
+<!-- ============================================================ -->
+<!-- LOGIN -->
+<!-- ============================================================ -->
+<div id="login-screen">
+  <div class="login-box">
+    <p class="login-eyebrow">Control financiero</p>
+    <h1 class="login-title">Iniciar sesión</h1>
+    <div class="card">
+      <div id="login-error" class="error-msg hidden"></div>
+      <div class="field">
+        <label>Correo</label>
+        <input type="email" id="login-email" autocomplete="email" />
+      </div>
+      <div class="field">
+        <label>Contraseña</label>
+        <input type="password" id="login-password" autocomplete="current-password" />
+      </div>
+      <button class="btn-primary" onclick="handleLogin()">Entrar</button>
+    </div>
+    <p class="hint">Acceso restringido. Las cuentas de usuario las crea el administrador desde Supabase.</p>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- APP -->
+<!-- ============================================================ -->
+<div id="app" class="hidden">
+  <header id="app-header">
+    <div class="brand">
+      <span class="eyebrow" id="user-role-label">—</span>
+      <h1 id="user-name-label">Hola</h1>
+    </div>
+    <nav id="nav">
+      <button class="nav-btn" data-section="dashboard" onclick="showSection('dashboard')">Dashboard</button>
+      <button class="nav-btn" data-section="ingresos" onclick="showSection('ingresos')">Ingresos</button>
+      <button class="nav-btn" data-section="egresos" onclick="showSection('egresos')">Egresos</button>
+      <button class="nav-btn" data-section="bancos" onclick="showSection('bancos')">Bancos / Caja</button>
+      <button class="nav-btn" data-section="fijos" onclick="showSection('fijos')">Gastos fijos</button>
+    </nav>
+    <button class="btn-secondary" onclick="handleLogout()">Cerrar sesión</button>
+  </header>
+
+  <main>
+
+    <!-- ---------------- DASHBOARD ---------------- -->
+    <section id="section-dashboard" class="section">
+      <div class="grid grid-4" id="dashboard-stats">
+        <!-- stat cards inyectadas por JS -->
+      </div>
+
+      <div class="grid grid-2" style="margin-top:16px;">
+        <div>
+          <h2 style="font-size:16px; margin-bottom:10px;">Saldo por cuenta</h2>
+          <div id="dashboard-cuentas"></div>
+        </div>
+        <div>
+          <h2 style="font-size:16px; margin-bottom:10px;">Últimos movimientos</h2>
+          <div id="dashboard-ultimos"></div>
+        </div>
+      </div>
+
+      <div class="chart-wrap">
+        <h2 style="font-size:16px; margin-bottom:10px;">Evolución del mes: ingresos vs egresos</h2>
+        <canvas id="chart-evolucion" height="90"></canvas>
+      </div>
+    </section>
+
+    <!-- ---------------- INGRESOS ---------------- -->
+    <section id="section-ingresos" class="section">
+      <div class="toolbar">
+        <h2>Ingresos</h2>
+        <button class="btn-secondary" onclick="toggleForm('form-ingreso')">+ Nuevo ingreso</button>
+      </div>
+
+      <div id="form-ingreso" class="card hidden" style="margin-bottom:16px;">
+        <div class="form-row">
+          <div class="field"><label>Fecha</label><input type="date" id="ing-fecha" /></div>
+          <div class="field"><label>Monto</label><input type="number" step="0.01" id="ing-monto" /></div>
+          <div class="field"><label>Cuenta</label><select id="ing-cuenta"></select></div>
+          <div class="field"><label>Categoría</label><select id="ing-categoria"></select></div>
+          <div class="field"><label>Cliente</label><input type="text" id="ing-cliente" /></div>
+          <div class="field"><label>Medio de pago</label>
+            <select id="ing-medio">
+              <option value="efectivo">Efectivo</option>
+              <option value="transferencia">Transferencia</option>
+              <option value="tarjeta">Tarjeta</option>
+              <option value="cheque">Cheque</option>
+            </select>
+          </div>
+        </div>
+        <div class="field"><label>Descripción</label><input type="text" id="ing-descripcion" /></div>
+        <button class="btn-primary" style="width:auto; padding:9px 18px;" onclick="saveMovimiento('ingreso')">Guardar ingreso</button>
+      </div>
+
+      <div id="ingresos-list"></div>
+    </section>
+
+    <!-- ---------------- EGRESOS ---------------- -->
+    <section id="section-egresos" class="section">
+      <div class="toolbar">
+        <h2>Egresos</h2>
+        <button class="btn-secondary" onclick="toggleForm('form-egreso')">+ Nuevo egreso</button>
+      </div>
+
+      <div id="form-egreso" class="card hidden" style="margin-bottom:16px;">
+        <div class="form-row">
+          <div class="field"><label>Fecha</label><input type="date" id="egr-fecha" /></div>
+          <div class="field"><label>Monto</label><input type="number" step="0.01" id="egr-monto" /></div>
+          <div class="field"><label>Cuenta</label><select id="egr-cuenta"></select></div>
+          <div class="field"><label>Categoría</label><select id="egr-categoria"></select></div>
+          <div class="field"><label>Proveedor</label><input type="text" id="egr-proveedor" /></div>
+          <div class="field"><label>Medio de pago</label>
+            <select id="egr-medio">
+              <option value="efectivo">Efectivo</option>
+              <option value="transferencia">Transferencia</option>
+              <option value="tarjeta">Tarjeta</option>
+              <option value="cheque">Cheque</option>
+            </select>
+          </div>
+        </div>
+        <div class="field"><label>Descripción</label><input type="text" id="egr-descripcion" /></div>
+        <button class="btn-primary" style="width:auto; padding:9px 18px;" onclick="saveMovimiento('egreso')">Guardar egreso</button>
+      </div>
+
+      <div id="egresos-list"></div>
+    </section>
+
+    <!-- ---------------- BANCOS / CAJA ---------------- -->
+    <section id="section-bancos" class="section">
+      <div class="toolbar">
+        <h2>Bancos / Caja</h2>
+        <button class="btn-secondary" onclick="toggleForm('form-cuenta')">+ Nueva cuenta</button>
+      </div>
+
+      <div id="form-cuenta" class="card hidden" style="margin-bottom:16px;">
+        <div class="form-row">
+          <div class="field"><label>Nombre</label><input type="text" id="cta-nombre" /></div>
+          <div class="field"><label>Tipo</label>
+            <select id="cta-tipo">
+              <option value="banco">Banco</option>
+              <option value="caja">Caja</option>
+            </select>
+          </div>
+          <div class="field"><label>Saldo inicial</label><input type="number" step="0.01" id="cta-saldo" value="0" /></div>
+        </div>
+        <button class="btn-primary" style="width:auto; padding:9px 18px;" onclick="saveCuenta()">Guardar cuenta</button>
+      </div>
+
+      <div id="cuentas-list"></div>
+    </section>
+
+    <!-- ---------------- GASTOS FIJOS ---------------- -->
+    <section id="section-fijos" class="section">
+      <div class="toolbar">
+        <h2>Gastos fijos</h2>
+        <div style="display:flex; gap:8px;">
+          <button class="btn-secondary" onclick="generarGastosFijosDelMes()">Generar gastos de este mes</button>
+          <button class="btn-secondary" onclick="toggleForm('form-fijo')">+ Nuevo gasto fijo</button>
+        </div>
+      </div>
+
+      <div id="form-fijo" class="card hidden" style="margin-bottom:16px;">
+        <div class="form-row">
+          <div class="field"><label>Nombre</label><input type="text" id="fijo-nombre" /></div>
+          <div class="field"><label>Monto</label><input type="number" step="0.01" id="fijo-monto" /></div>
+          <div class="field"><label>Categoría</label><select id="fijo-categoria"></select></div>
+          <div class="field"><label>Cuenta</label><select id="fijo-cuenta"></select></div>
+          <div class="field"><label>Día de generación</label><input type="number" min="1" max="28" id="fijo-dia" value="1" /></div>
+        </div>
+        <button class="btn-primary" style="width:auto; padding:9px 18px;" onclick="saveGastoFijo()">Guardar gasto fijo</button>
+      </div>
+
+      <p style="font-size:12px; color:var(--ink-soft); margin-bottom:12px;">
+        "Generar gastos de este mes" crea un egreso por cada gasto fijo activo que todavía no se generó en el mes actual. No se duplica si lo apretás dos veces.
+      </p>
+
+      <div id="fijos-list"></div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+// ============================================================
+// CONFIGURACIÓN — completá con los datos de tu proyecto Supabase
+// (Project Settings → API). La anon/publishable key es segura de
+// exponer acá: los permisos reales los define RLS en la base.
+// ============================================================
+const SUPABASE_URL = "https://TU-PROYECTO.supabase.co";
+const SUPABASE_ANON_KEY = "TU_ANON_KEY";
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentProfile = null;
+let categorias = [];
+let cuentas = [];
+let evolucionChart = null;
+
+// ------------------------------------------------------------
+// Utilidades
+// ------------------------------------------------------------
+function fmtMoney(n) {
+  return (n || 0).toLocaleString("es-AR", { style: "currency", currency: "ARS", minimumFractionDigits: 0 });
+}
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+function firstDayOfMonthISO() {
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
+}
+function showError(elId, message) {
+  const el = document.getElementById(elId);
+  el.textContent = message;
+  el.classList.remove("hidden");
+}
+function toggleForm(id) {
+  document.getElementById(id).classList.toggle("hidden");
+}
+
+// ------------------------------------------------------------
+// Auth
+// ------------------------------------------------------------
+async function handleLogin() {
+  const email = document.getElementById("login-email").value.trim();
+  const password = document.getElementById("login-password").value;
+  document.getElementById("login-error").classList.add("hidden");
+
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) {
+    showError("login-error", error.message);
+    return;
+  }
+  await initApp();
+}
+
+async function handleLogout() {
+  await sb.auth.signOut();
+  document.getElementById("app").classList.add("hidden");
+  document.getElementById("login-screen").classList.remove("hidden");
+}
+
+async function checkSession() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    await initApp();
+  }
+}
+
+// ------------------------------------------------------------
+// Init
+// ------------------------------------------------------------
+async function initApp() {
+  document.getElementById("login-screen").classList.add("hidden");
+  document.getElementById("app").classList.remove("hidden");
+
+  const { data: { user } } = await sb.auth.getUser();
+  const { data: profile } = await sb.from("profiles").select("id, nombre, role").eq("id", user.id).single();
+  currentProfile = profile;
+
+  document.getElementById("user-name-label").textContent = "Hola, " + (profile?.nombre || "");
+  document.getElementById("user-role-label").textContent = profile?.role === "admin" ? "Administrador" : "Usuario";
+
+  await loadCategoriasYCuentas();
+  showSection("dashboard");
+}
+
+async function loadCategoriasYCuentas() {
+  const { data: cats } = await sb.from("categorias").select("id, nombre, tipo").order("nombre");
+  categorias = cats || [];
+
+  const { data: cts } = await sb.from("cuentas").select("id, nombre, tipo, saldo_inicial").eq("activa", true).order("nombre");
+  cuentas = cts || [];
+
+  fillSelect("ing-categoria", categorias.filter(c => c.tipo === "ingreso"), "Sin categoría");
+  fillSelect("egr-categoria", categorias.filter(c => c.tipo === "egreso"), "Sin categoría");
+  fillSelect("fijo-categoria", categorias.filter(c => c.tipo === "egreso"), "Sin categoría");
+  fillSelect("ing-cuenta", cuentas, null);
+  fillSelect("egr-cuenta", cuentas, null);
+  fillSelect("fijo-cuenta", cuentas, null);
+
+  document.getElementById("ing-fecha").value = todayISO();
+  document.getElementById("egr-fecha").value = todayISO();
+}
+
+function fillSelect(id, items, emptyLabel) {
+  const el = document.getElementById(id);
+  el.innerHTML = "";
+  if (emptyLabel) {
+    const opt = document.createElement("option");
+    opt.value = ""; opt.textContent = emptyLabel;
+    el.appendChild(opt);
+  }
+  items.forEach(item => {
+    const opt = document.createElement("option");
+    opt.value = item.id;
+    opt.textContent = item.nombre;
+    el.appendChild(opt);
+  });
+}
+
+// ------------------------------------------------------------
+// Navegación
+// ------------------------------------------------------------
+function showSection(name) {
+  document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
+  document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+  document.getElementById("section-" + name).classList.add("active");
+  document.querySelector('.nav-btn[data-section="' + name + '"]').classList.add("active");
+
+  if (name === "dashboard") loadDashboard();
+  if (name === "ingresos") loadMovimientos("ingreso");
+  if (name === "egresos") loadMovimientos("egreso");
+  if (name === "bancos") loadCuentas();
+  if (name === "fijos") loadGastosFijos();
+}
+
+// ------------------------------------------------------------
+// Dashboard
+// ------------------------------------------------------------
+async function loadDashboard() {
+  const hoy = todayISO();
+  const inicioMes = firstDayOfMonthISO();
+
+  const { data: movsHoy } = await sb.from("movimientos_caja").select("tipo, monto").eq("fecha", hoy);
+  const { data: movsMes } = await sb.from("movimientos_caja").select("tipo, monto, fecha").gte("fecha", inicioMes);
+  const { data: todosMovs } = await sb.from("movimientos_caja").select("tipo, monto, cuenta_id");
+
+  const ingresosHoy = (movsHoy || []).filter(m => m.tipo === "ingreso").reduce((s, m) => s + Number(m.monto), 0);
+  const egresosHoy = (movsHoy || []).filter(m => m.tipo === "egreso").reduce((s, m) => s + Number(m.monto), 0);
+  const ingresosMes = (movsMes || []).filter(m => m.tipo === "ingreso").reduce((s, m) => s + Number(m.monto), 0);
+  const egresosMes = (movsMes || []).filter(m => m.tipo === "egreso").reduce((s, m) => s + Number(m.monto), 0);
+  const resultadoMes = ingresosMes - egresosMes;
+
+  const saldoTotal = cuentas.reduce((sum, c) => {
+    const movsCta = (todosMovs || []).filter(m => m.cuenta_id === c.id);
+    const ing = movsCta.filter(m => m.tipo === "ingreso").reduce((s, m) => s + Number(m.monto), 0);
+    const egr = movsCta.filter(m => m.tipo === "egreso").reduce((s, m) => s + Number(m.monto), 0);
+    return sum + Number(c.saldo_inicial) + ing - egr;
+  }, 0);
+
+  document.getElementById("dashboard-stats").innerHTML = `
+    <div class="stat-card"><div class="label">Saldo total</div><div class="value">${fmtMoney(saldoTotal)}</div></div>
+    <div class="stat-card"><div class="label">Ingresos hoy</div><div class="value gain">${fmtMoney(ingresosHoy)}</div></div>
+    <div class="stat-card"><div class="label">Egresos hoy</div><div class="value loss">${fmtMoney(egresosHoy)}</div></div>
+    <div class="stat-card"><div class="label">Resultado del mes</div><div class="value ${resultadoMes >= 0 ? 'gain' : 'loss'}">${fmtMoney(resultadoMes)}</div></div>
+  `;
+
+  // Saldo por cuenta
+  const cuentasHtml = cuentas.map(c => {
+    const movsCta = (todosMovs || []).filter(m => m.cuenta_id === c.id);
+    const ing = movsCta.filter(m => m.tipo === "ingreso").reduce((s, m) => s + Number(m.monto), 0);
+    const egr = movsCta.filter(m => m.tipo === "egreso").reduce((s, m) => s + Number(m.monto), 0);
+    const saldo = Number(c.saldo_inicial) + ing - egr;
+    return `<div class="stat-card" style="margin-bottom:8px;">
+      <div class="label">${c.nombre} <span class="badge">${c.tipo}</span></div>
+      <div class="value">${fmtMoney(saldo)}</div>
+    </div>`;
+  }).join("") || `<div class="empty-state">Todavía no cargaste ninguna cuenta. Andá a "Bancos / Caja".</div>`;
+  document.getElementById("dashboard-cuentas").innerHTML = cuentasHtml;
+
+  // Últimos movimientos
+  const { data: ultimos } = await sb.from("movimientos_caja")
+    .select("id, tipo, monto, descripcion, created_at")
+    .order("created_at", { ascending: false })
+    .limit(6);
+
+  document.getElementById("dashboard-ultimos").innerHTML = (ultimos && ultimos.length)
+    ? `<table><tbody>${ultimos.map(m => `
+        <tr>
+          <td>${m.descripcion || "(sin descripción)"}</td>
+          <td style="text-align:right;" class="${m.tipo === 'ingreso' ? 'amount-in' : 'amount-out'}">
+            ${m.tipo === 'ingreso' ? '+' : '−'}${fmtMoney(m.monto)}
+          </td>
+        </tr>`).join("")}</tbody></table>`
+    : `<div class="empty-state">Sin movimientos todavía.</div>`;
+
+  renderEvolucionChart(movsMes || [], inicioMes);
+}
+
+function renderEvolucionChart(movsMes, inicioMes) {
+  const dias = {};
+  const start = new Date(inicioMes);
+  const end = new Date();
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    dias[d.toISOString().slice(0, 10)] = { ingreso: 0, egreso: 0 };
+  }
+  movsMes.forEach(m => {
+    if (!dias[m.fecha]) dias[m.fecha] = { ingreso: 0, egreso: 0 };
+    dias[m.fecha][m.tipo] += Number(m.monto);
+  });
+  const labels = Object.keys(dias).sort();
+  const ingresos = labels.map(l => dias[l].ingreso);
+  const egresos = labels.map(l => dias[l].egreso);
+
+  if (evolucionChart) evolucionChart.destroy();
+  const ctx = document.getElementById("chart-evolucion").getContext("2d");
+  evolucionChart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: labels.map(l => l.slice(8, 10) + "/" + l.slice(5, 7)),
+      datasets: [
+        { label: "Ingresos", data: ingresos, borderColor: "#1F6E4A", backgroundColor: "rgba(31,110,74,0.08)", fill: true, tension: 0.3 },
+        { label: "Egresos", data: egresos, borderColor: "#A8412E", backgroundColor: "rgba(168,65,46,0.08)", fill: true, tension: 0.3 },
+      ]
+    },
+    options: { responsive: true, plugins: { legend: { position: "bottom" } } }
+  });
+}
+
+// ------------------------------------------------------------
+// Ingresos / Egresos (tabla movimientos_caja)
+// ------------------------------------------------------------
+async function saveMovimiento(tipo) {
+  const prefix = tipo === "ingreso" ? "ing" : "egr";
+  const { data: { user } } = await sb.auth.getUser();
+
+  const payload = {
+    tipo,
+    fecha: document.getElementById(prefix + "-fecha").value || todayISO(),
+    monto: Number(document.getElementById(prefix + "-monto").value),
+    cuenta_id: document.getElementById(prefix + "-cuenta").value || null,
+    categoria_id: document.getElementById(prefix + "-categoria").value || null,
+    cliente_proveedor: document.getElementById(prefix + (tipo === "ingreso" ? "-cliente" : "-proveedor")).value || null,
+    medio_pago: document.getElementById(prefix + "-medio").value,
+    descripcion: document.getElementById(prefix + "-descripcion").value || null,
+    creado_por: user.id,
+  };
+
+  if (!payload.monto || payload.monto <= 0) {
+    alert("Cargá un monto válido.");
+    return;
+  }
+
+  const { error } = await sb.from("movimientos_caja").insert(payload);
+  if (error) {
+    alert("Error al guardar: " + error.message);
+    return;
+  }
+
+  toggleForm("form-" + tipo);
+  document.getElementById(prefix + "-monto").value = "";
+  document.getElementById(prefix + "-descripcion").value = "";
+  loadMovimientos(tipo);
+}
+
+async function loadMovimientos(tipo) {
+  const { data } = await sb.from("movimientos_caja")
+    .select("id, fecha, monto, descripcion, cliente_proveedor, medio_pago, categorias(nombre)")
+    .eq("tipo", tipo)
+    .order("fecha", { ascending: false })
+    .limit(100);
+
+  const listId = tipo === "ingreso" ? "ingresos-list" : "egresos-list";
+  const el = document.getElementById(listId);
+
+  if (!data || data.length === 0) {
+    el.innerHTML = `<div class="empty-state">Todavía no hay ${tipo === "ingreso" ? "ingresos" : "egresos"} cargados.</div>`;
+    return;
+  }
+
+  el.innerHTML = `<table>
+    <thead><tr><th>Fecha</th><th>${tipo === "ingreso" ? "Cliente" : "Proveedor"}</th><th>Categoría</th><th>Medio</th><th style="text-align:right;">Monto</th></tr></thead>
+    <tbody>${data.map(m => `
+      <tr>
+        <td>${m.fecha}</td>
+        <td>${m.cliente_proveedor || "—"}</td>
+        <td>${m.categorias?.nombre || "Sin categoría"}</td>
+        <td>${m.medio_pago}</td>
+        <td style="text-align:right;" class="${tipo === 'ingreso' ? 'amount-in' : 'amount-out'}">${fmtMoney(m.monto)}</td>
+      </tr>`).join("")}
+    </tbody>
+  </table>`;
+}
+
+// ------------------------------------------------------------
+// Cuentas (bancos / caja)
+// ------------------------------------------------------------
+async function saveCuenta() {
+  const payload = {
+    nombre: document.getElementById("cta-nombre").value.trim(),
+    tipo: document.getElementById("cta-tipo").value,
+    saldo_inicial: Number(document.getElementById("cta-saldo").value) || 0,
+  };
+  if (!payload.nombre) { alert("Ponele un nombre a la cuenta."); return; }
+
+  const { error } = await sb.from("cuentas").insert(payload);
+  if (error) { alert("Error: " + error.message); return; }
+
+  toggleForm("form-cuenta");
+  document.getElementById("cta-nombre").value = "";
+  document.getElementById("cta-saldo").value = "0";
+  await loadCategoriasYCuentas();
+  loadCuentas();
+}
+
+async function loadCuentas() {
+  const { data } = await sb.from("cuentas").select("id, nombre, tipo, saldo_inicial, activa").order("nombre");
+  const el = document.getElementById("cuentas-list");
+  if (!data || data.length === 0) {
+    el.innerHTML = `<div class="empty-state">No hay cuentas cargadas todavía.</div>`;
+    return;
+  }
+  el.innerHTML = `<table>
+    <thead><tr><th>Nombre</th><th>Tipo</th><th style="text-align:right;">Saldo inicial</th></tr></thead>
+    <tbody>${data.map(c => `
+      <tr>
+        <td>${c.nombre}</td>
+        <td><span class="badge">${c.tipo}</span></td>
+        <td style="text-align:right;" class="mono">${fmtMoney(c.saldo_inicial)}</td>
+      </tr>`).join("")}
+    </tbody>
+  </table>`;
+}
+
+// ------------------------------------------------------------
+// Gastos fijos
+// ------------------------------------------------------------
+async function saveGastoFijo() {
+  const payload = {
+    nombre: document.getElementById("fijo-nombre").value.trim(),
+    monto: Number(document.getElementById("fijo-monto").value),
+    categoria_id: document.getElementById("fijo-categoria").value || null,
+    cuenta_id: document.getElementById("fijo-cuenta").value || null,
+    dia_generacion: Number(document.getElementById("fijo-dia").value) || 1,
+  };
+  if (!payload.nombre || !payload.monto) { alert("Completá nombre y monto."); return; }
+
+  const { error } = await sb.from("gastos_fijos").insert(payload);
+  if (error) { alert("Error: " + error.message); return; }
+
+  toggleForm("form-fijo");
+  document.getElementById("fijo-nombre").value = "";
+  document.getElementById("fijo-monto").value = "";
+  loadGastosFijos();
+}
+
+async function loadGastosFijos() {
+  const { data } = await sb.from("gastos_fijos")
+    .select("id, nombre, monto, dia_generacion, activo, categorias(nombre), cuentas(nombre)")
+    .order("nombre");
+
+  const el = document.getElementById("fijos-list");
+  if (!data || data.length === 0) {
+    el.innerHTML = `<div class="empty-state">No hay gastos fijos configurados todavía.</div>`;
+    return;
+  }
+  el.innerHTML = `<table>
+    <thead><tr><th>Nombre</th><th>Categoría</th><th>Cuenta</th><th>Día</th><th style="text-align:right;">Monto</th></tr></thead>
+    <tbody>${data.map(g => `
+      <tr>
+        <td>${g.nombre}</td>
+        <td>${g.categorias?.nombre || "—"}</td>
+        <td>${g.cuentas?.nombre || "—"}</td>
+        <td>${g.dia_generacion}</td>
+        <td style="text-align:right;" class="mono">${fmtMoney(g.monto)}</td>
+      </tr>`).join("")}
+    </tbody>
+  </table>`;
+}
+
+async function generarGastosFijosDelMes() {
+  const inicioMes = firstDayOfMonthISO();
+  const { data: { user } } = await sb.auth.getUser();
+
+  const { data: fijos } = await sb.from("gastos_fijos").select("*").eq("activo", true);
+  if (!fijos || fijos.length === 0) {
+    alert("No hay gastos fijos activos para generar.");
+    return;
+  }
+
+  let generados = 0, saltados = 0;
+
+  for (const fijo of fijos) {
+    const { data: yaExiste } = await sb.from("gastos_fijos_generados")
+      .select("id").eq("gasto_fijo_id", fijo.id).eq("periodo", inicioMes).maybeSingle();
+
+    if (yaExiste) { saltados++; continue; }
+
+    const { data: movInsertado, error: errMov } = await sb.from("movimientos_caja").insert({
+      tipo: "egreso",
+      fecha: todayISO(),
+      monto: fijo.monto,
+      categoria_id: fijo.categoria_id,
+      cuenta_id: fijo.cuenta_id,
+      medio_pago: "transferencia",
+      descripcion: "Gasto fijo: " + fijo.nombre,
+      creado_por: user.id,
+    }).select().single();
+
+    if (errMov) { console.error(errMov); continue; }
+
+    await sb.from("gastos_fijos_generados").insert({
+      gasto_fijo_id: fijo.id,
+      periodo: inicioMes,
+      movimiento_id: movInsertado.id,
+    });
+    generados++;
+  }
+
+  alert(`Generados: ${generados}. Ya existían este mes: ${saltados}.`);
+  loadDashboard();
+}
+
+// ------------------------------------------------------------
+// Arranque
+// ------------------------------------------------------------
+checkSession();
+</script>
+</body>
+</html>
